@@ -20,6 +20,21 @@ import Foundation
               "Root configuration binds the authorizing UID and exact client identity")
         check(values[1]["ProgramArguments"] as? [String] == [HelperConstants.executable], "Launch daemon accepts no user-supplied command arguments")
         check(values[1]["MachServices"] as? [String: Bool] == [HelperConstants.label: true], "Daemon exposes only its fixed Mach service")
+        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+        let realRule = try CodeIdentity.requirement(at: executable)
+        func verify(_ requirement: String) throws -> Bool {
+            let generated = try HelperInstaller.installScript(source: executable.path, client: realRule, helper: requirement, uid: getuid())
+            let line = generated.components(separatedBy: .newlines).first { $0.hasPrefix("/usr/bin/codesign ") }!
+            let command = line.replacingOccurrences(of: "\"$staging/helper\"", with: ShellEscaping.quote(executable.path))
+            let verifier = Process()
+            verifier.executableURL = URL(fileURLWithPath: "/bin/sh")
+            verifier.arguments = ["-c", command]
+            verifier.standardError = FileHandle.nullDevice
+            try verifier.run(); verifier.waitUntilExit()
+            return verifier.terminationStatus == 0
+        }
+        check(try verify(realRule), "Exact installer codesign command accepts the pinned signed binary")
+        check(try !verify("identifier \"fr.local.moka.wrong-helper\""), "Exact installer codesign command rejects another identity")
         print("\(count) installer tests passed")
     }
 }

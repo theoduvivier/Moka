@@ -57,7 +57,9 @@ cd Moka
 ./run-tests.sh
 ```
 
-L’application est créée dans `build/Moka.app`. **98 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives et le refus de signatures XPC incorrectes. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
+L’application est créée dans `build/Moka.app`. **100 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives, la commande de vérification de l’installateur et le refus de signatures XPC incorrectes. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
+
+Validation locale du 30 octobre 2026 : service installé avec autorisation macOS, deux activations consécutives sans nouvelle demande de mot de passe, `SleepDisabled` passant de 0 à 1 à l’activation puis revenant à 0 à l’arrêt. La restauration a aussi été vérifiée en quittant Moka avec le capot actif ; un relancement laisse la session arrêtée. La fermeture physique du capot et l’autonomie sur longue durée restent à vérifier sur chaque modèle.
 
 ## Partager et avertissement macOS
 

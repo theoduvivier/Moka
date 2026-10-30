@@ -88,7 +88,7 @@ enum HelperInstaller {
         /usr/sbin/chown 0:0 "$staging/helper"
         /bin/chmod 755 "$staging/helper"
         # Verify the protected copy before any privileged execution.
-        /usr/bin/codesign --verify --strict -R \(q(helper)) "$staging/helper"
+        /usr/bin/codesign --verify --strict -R \(q("=" + helper)) "$staging/helper"
         /usr/bin/printf %s \(q(config64)) | /usr/bin/base64 -D > "$staging/config"
         /usr/bin/printf %s \(q(launch64)) | /usr/bin/base64 -D > "$staging/launch"
         /usr/bin/plutil -lint "$staging/config" "$staging/launch" >/dev/null
