@@ -71,13 +71,30 @@ enum RobotAssets {
 struct RobotAvatar: View {
     var awake: Bool
     var size: CGFloat = 92
+    var isVisible: Bool = false
+    @SwiftUI.State private var blink = 0.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var canBlink: Bool { awake && isVisible && !reduceMotion }
     var body: some View {
-        RobotPose(wake: awake ? 1 : 0, size: size, reduceMotion: reduceMotion)
-            // One reversible gesture. No scheduled steps, repeat loop or idle timer.
+        RobotPose(wake: awake ? 1 : 0, blink: blink, size: size, reduceMotion: reduceMotion)
             .animation(reduceMotion ? .easeInOut(duration: 0.15)
                 : .timingCurve(0.32, 0, 0.2, 1, duration: 0.72), value: awake)
             .accessibilityHidden(true)
+            .task(id: canBlink) {
+                // A cancellable suspension, with no timer firing behind a closed panel.
+                blink = 0
+                guard canBlink else { return }
+                do {
+                    while !Task.isCancelled {
+                        try await Task.sleep(for: .seconds(Double.random(in: 5...11)))
+                        try Task.checkCancellation()
+                        withAnimation(.easeIn(duration: 0.09)) { blink = 1 }
+                        try await Task.sleep(for: .milliseconds(140))
+                        try Task.checkCancellation()
+                        withAnimation(.easeOut(duration: 0.14)) { blink = 0 }
+                    }
+                } catch { /* Visibility or session changed; the replacement task resets the eyes. */ }
+            }
     }
 }
 
@@ -85,26 +102,31 @@ struct RobotAvatar: View {
 /// the current frame instead of leaving delayed bounces or eye changes queued.
 struct RobotPose: View, Animatable {
     var wake: Double
+    var blink: Double = 0
     var size: CGFloat
     var reduceMotion: Bool
-    var animatableData: Double {
-        get { wake }
-        set { wake = newValue }
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(wake, blink) }
+        set { wake = newValue.first; blink = newValue.second }
     }
     var body: some View {
         let p = min(1, max(0, wake))
         let arc = reduceMotion ? 0 : sin(.pi * p)
         let eye = min(1, max(0, (p - 0.18) / 0.64))
-        let open = eye * eye * (3 - 2 * eye)
+        let open = eye * eye * (3 - 2 * eye) * (1 - min(1, max(0, blink)))
         let settle = reduceMotion ? 0 : sin(2 * .pi * p)
         ZStack {
             if let rest = RobotAssets.rest, let active = RobotAssets.awake {
                 Image(nsImage: rest).resizable().interpolation(.high).scaledToFit().opacity(1 - open)
-                Image(nsImage: active).resizable().interpolation(.high).scaledToFit().opacity(open)
+                // Add the complementary, premultiplied images inside an isolated
+                // group. A normal opacity crossfade makes the metal translucent
+                // halfway through a blink, creating a distracting body flash.
+                Image(nsImage: active).resizable().interpolation(.high).scaledToFit().opacity(open).blendMode(.plusLighter)
             } else {
-                Image(nsImage: MenuBarIcon.image(fill: p)).resizable().scaledToFit()
+                Image(nsImage: MenuBarIcon.image(fill: open)).resizable().scaledToFit()
             }
         }
+        .compositingGroup()
         .frame(width: size, height: size)
         .scaleEffect(x: 1 + 0.025 * settle, y: 1 - 0.025 * settle, anchor: .bottom)
         .rotation3DEffect(.degrees(-7 * arc), axis: (x: 0, y: 1, z: 0), perspective: 0.25)

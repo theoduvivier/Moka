@@ -26,6 +26,10 @@ final class StatusActivityDot: NSView {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let model = AppModel()
+    private lazy var updates = UpdateCoordinator { [weak self] in
+        guard let self else { return true }
+        return self.model.enabled || self.model.lid.needsPulse
+    }
     private var statusItem: NSStatusItem!
     private var panel: MenuPanel?
     private var outsideMonitor: Any?
@@ -93,7 +97,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             return event
         }
-        model.objectWillChange.sink { [weak self] in DispatchQueue.main.async { self?.updateStatus() } }.store(in: &subscriptions)
+        model.objectWillChange.sink { [weak self] in
+            DispatchQueue.main.async {
+                self?.updateStatus()
+                self?.updates.sessionEnded()
+            }
+        }.store(in: &subscriptions)
+        if !CommandLine.arguments.contains("--render") { updates.start() }
         if !UserDefaults.standard.bool(forKey: "hasLaunched") || CommandLine.arguments.contains("--show") {
             UserDefaults.standard.set(true, forKey: "hasLaunched")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.showPopover() }
@@ -107,6 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         menu.addItem(appItem)
@@ -201,6 +213,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let menu = NSMenu()
             menu.addItem(withTitle: model.enabled ? "Terminer la session" : "Garder mon Mac éveillé", action: #selector(toggleSession), keyEquivalent: "").target = self
             menu.addItem(.separator())
+            menu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+            let automatic = menu.addItem(withTitle: "Rechercher automatiquement", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
+            automatic.target = self
+            automatic.state = updates.automatic ? .on : .off
+            menu.addItem(.separator())
             menu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
@@ -209,6 +226,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         else { showPopover() }
     }
     @objc private func toggleSession() { model.toggle() }
+    @objc private func checkForUpdates() { hidePanel(); updates.checkNow() }
+    @objc private func toggleAutomaticUpdates() { updates.automatic.toggle() }
     private func showPopover() {
         guard let button = statusItem.button, let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
@@ -333,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return .terminateLater
     }
     func applicationWillTerminate(_ notification: Notification) {
+        updates.stop()
         iconAnimationTimer?.invalidate()
         model.shutdown()
     }

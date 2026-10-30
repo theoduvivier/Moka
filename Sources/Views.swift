@@ -49,11 +49,14 @@ struct MokaPanel: View {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 5) {
-                        RobotAvatar(awake: model.awake, size: 68)
+                        RobotAvatar(awake: model.awake, size: 68, isVisible: model.panelVisible)
                         Text(model.awake ? "Votre Mac reste éveillé" : "Moka est arrêté")
                             .font(.system(size: 22, weight: .semibold)).tracking(-0.7)
                         Text(explanation).font(.system(size: 12)).foregroundStyle(.secondary)
                             .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                            // Reserve two lines in every state so the session
+                            // button never moves underneath the user's pointer.
+                            .frame(height: 34, alignment: .top)
                     }.frame(maxWidth: .infinity).padding(.bottom, 17)
                     sessionButton.padding(.bottom, 14)
                     if model.lid.isSupported { lidSwitch }
