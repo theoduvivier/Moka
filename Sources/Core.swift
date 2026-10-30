@@ -26,6 +26,10 @@ struct PowerSnapshot: Equatable {
 }
 
 enum SessionPolicy {
+    static func timerInterval(enabled: Bool, lidNeedsPulse: Bool, panelVisible: Bool) -> TimeInterval {
+        if panelVisible && enabled { return 1 }
+        return enabled || lidNeedsPulse || panelVisible ? 5 : 0
+    }
     static func reachedReserve(power: PowerSnapshot, reserve: Int) -> Bool {
         power.onBattery && power.percentage.map { $0 <= reserve } == true
     }

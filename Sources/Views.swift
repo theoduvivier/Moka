@@ -120,7 +120,7 @@ struct MokaPanel: View {
                 OptionGlyph(symbol: .lid)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Aussi capot fermé").font(.system(size: 12))
-                    Text(model.lid.active ? "Actif · gardez le Mac ventilé."
+                    Text(model.lid.active ? "Actif · sur une table, jamais dans un sac."
                         : model.awake ? "Pour continuer en refermant le Mac."
                         : "Disponible pendant une session.")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
@@ -133,7 +133,7 @@ struct MokaPanel: View {
                     })).labelsHidden().toggleStyle(.switch).controlSize(.regular).tint(.green).disabled(!model.awake)
                 }
             }.frame(minHeight: 52)
-            .help("Autorisation administrateur requise. Le mode capot dure au maximum 4 heures et s’arrête avec la session.")
+            .help("Installation autorisée une fois, puis activation sans mot de passe. Maximum 4 heures. Le Mac doit rester ventilé ; ne l’utilisez pas dans un sac fermé.")
             if let message = lidMessage {
                 Text(message).font(.system(size: 10)).foregroundStyle(model.lid.message == nil ? Color.secondary : Color.orange)
                     .fixedSize(horizontal: false, vertical: true).padding(.bottom, 4)
@@ -141,7 +141,7 @@ struct MokaPanel: View {
         }
     }
     private var lidMessage: String? {
-        if model.lid.pending { return "Autorisation macOS en cours…" }
+        if model.lid.pending { return "Préparation du service Moka… Une autorisation est nécessaire à la première utilisation." }
         if model.lid.stopping { return "Restauration du réglage de veille…" }
         if model.lid.active { return nil }
         return model.lid.message

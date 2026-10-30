@@ -57,10 +57,6 @@ enum CoreTests {
         process.standardOutput = output
         try process.run(); process.waitUntilExit()
         check(String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) == malicious, "Shell arguments are literal, including metacharacters")
-        if let directory = ProcessInfo.processInfo.environment["MOKA_GUARD_FIXTURE_DIR"] {
-            let script = LidGuardScript.make(heartbeat: directory + "/heartbeat", token: "test-token", parentPID: getpid(), reserve: 15)
-            try script.write(toFile: directory + "/guard-template.sh", atomically: true, encoding: .utf8)
-        }
         if CommandLine.arguments.contains("--integration") {
             let assertions = SleepAssertions()
             try assertions.activate(display: false)

@@ -6,6 +6,7 @@ import Combine
 final class AppModel: ObservableObject {
     private let defaults: UserDefaults
     private let readPower: () -> PowerSnapshot
+    private let readThermal: () -> ProcessInfo.ThermalState
     @Published var reserve: Int { didSet {
         defaults.set(reserve, forKey: "reserve")
         lid.setReserve(reserve)
@@ -26,13 +27,15 @@ final class AppModel: ObservableObject {
     private let assertions = SleepAssertions()
     private var timer: Timer?
     private var timerInterval: TimeInterval = 0
-    private var lastRefresh = Date.distantPast
+    private var lastRefresh: TimeInterval = -.infinity
     private var activity: NSObjectProtocol?
     private var subscriptions: Set<AnyCancellable> = []
 
-    init(defaults: UserDefaults = .standard, readPower: @escaping () -> PowerSnapshot = PowerSnapshot.read) {
+    init(defaults: UserDefaults = .standard, readPower: @escaping () -> PowerSnapshot = PowerSnapshot.read,
+         readThermal: @escaping () -> ProcessInfo.ThermalState = { ProcessInfo.processInfo.thermalState }) {
         self.defaults = defaults
         self.readPower = readPower
+        self.readThermal = readThermal
         self.power = readPower()
         self.reserve = max(5, min(50, ((defaults.object(forKey: "reserve") as? Int ?? 15) + 2) / 5 * 5))
         self.lid = LidGuard(defaults: defaults)
@@ -42,9 +45,7 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in self?.tick(refresh: true) }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification).sink { [weak self] _ in
-            guard ProcessInfo.processInfo.thermalState == .critical else { return }
-            self?.stop()
-            self?.notice = "Session arrêtée : macOS signale une température critique."
+            self?.reconcile()
         }.store(in: &subscriptions)
         configureTimer()
     }
@@ -59,6 +60,10 @@ final class AppModel: ObservableObject {
         error = nil
         notice = nil
         power = readPower()
+        guard readThermal().rawValue < ProcessInfo.ThermalState.serious.rawValue else {
+            notice = "Le Mac est trop chaud. Laissez-le refroidir avant de démarrer."
+            return
+        }
         guard !SessionPolicy.reachedReserve(power: power, reserve: reserve) else {
             notice = "Batterie à \(power.percentage ?? reserve) % : rechargez le Mac pour démarrer."
             return
@@ -83,16 +88,22 @@ final class AppModel: ObservableObject {
     }
     private func reconcile() {
         guard enabled else { return }
+        if readThermal().rawValue >= ProcessInfo.ThermalState.serious.rawValue {
+            stop()
+            notice = "Session arrêtée : macOS signale une forte chaleur. Laissez le Mac refroidir sur une surface ventilée."
+            return
+        }
         if SessionPolicy.reachedReserve(power: power, reserve: reserve) {
             stop()
             notice = "Session arrêtée : batterie à \(power.percentage ?? reserve) %."
         }
     }
     private func configureTimer() {
-        let interval: TimeInterval = enabled || lid.needsPulse ? 1 : panelVisible ? 5 : 30
+        let interval = SessionPolicy.timerInterval(enabled: enabled, lidNeedsPulse: lid.needsPulse, panelVisible: panelVisible)
         guard interval != timerInterval else { return }
         timer?.invalidate()
         timerInterval = interval
+        guard interval > 0 else { timer = nil; return }
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.tick() }
         timer.tolerance = interval == 1 ? 0.1 : 1
         self.timer = timer
@@ -103,8 +114,9 @@ final class AppModel: ObservableObject {
         if panelVisible || refresh { now = timestamp }
         if lid.needsPulse { lid.pulse() }
         guard enabled || panelVisible || refresh else { return }
-        if timestamp.timeIntervalSince(lastRefresh) >= 5 || refresh {
-            lastRefresh = timestamp
+        let uptime = ProcessInfo.processInfo.systemUptime
+        if uptime - lastRefresh >= 5 || refresh {
+            lastRefresh = uptime
             let snapshot = readPower()
             if power != snapshot { power = snapshot }
             reconcile()

@@ -2,53 +2,78 @@
 
 <p align="center"><img src="docs/moka.png" width="360" alt="Moka : maintien éveillé, capot fermé et seuil de batterie"></p>
 
-Version actuelle : **3.0.1**. [Télécharger l’application](https://github.com/theoduvivier/Moka/releases/latest).
+Version **1.0.0** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
 
-Une application native dans la barre des menus, avec trois commandes sur un seul panneau :
+Une application native dans la barre des menus, avec trois commandes :
 
-- **Garder le Mac éveillé** démarre la session ; **Arrêter la session** l’arrête. L’écran peut s’éteindre normalement, les tâches continuent. Le bouton affiche seulement le temps écoulé.
-- **Aussi capot fermé** permet de continuer en refermant le Mac, avec autorisation administrateur.
-- **Seuil de batterie** règle l’arrêt automatique entre 5 et 50 %, par pas de 5 %. Sur secteur, ce seuil ne s’applique pas.
+- **Garder le Mac éveillé** : les tâches peuvent continuer, l’écran peut s’éteindre normalement. **Arrêter la session** libère la protection de Moka. Le bouton affiche le temps écoulé.
+- **Aussi capot fermé** : continue en refermant le Mac. Le service demande une autorisation administrateur à sa première installation ; les activations suivantes n’en demandent pas.
+- **Seuil de batterie** : arrêt automatique entre 5 et 50 %, par pas de 5 %. Sur secteur, ce seuil ne s’applique pas. Recharger ne relance jamais une session automatiquement.
 
-Atteindre le seuil arrête réellement la session. Recharger ou rebrancher le Mac ne la redémarre pas : il faut cliquer à nouveau. Les anciennes préférences d’écran, de durée, de téléphone et d’autorisation sur batterie ne sont plus lues. L’application ne contient plus de fonctionnalité Wi-Fi ni de demande de localisation. Il n’y a plus de panneau de réglages.
+## Usage et autonomie
 
-## Interface
+Moka empêche la veille globale ; il ne choisit pas quelles applications ont le droit de travailler. Claude Code, VS Code, Codex et Chrome restent soumis à leur propre comportement en arrière-plan, aux demandes de validation et à la connexion réseau. Moka ne suspend pas de force d’autres applications et ne garantit pas la poursuite d’un onglet que son navigateur met au repos.
 
-Robot en aluminium au repos ou éveillé, animation courte et réversible, verre système, palette neutre et interrupteur vert. Deux pictogrammes natifs macOS, fins et fixes, indiquent le capot et la batterie. Leur forme ne change pas : le switch et l’indicateur de la barre des menus portent l’état. Aucun MacBook 3D n’est livré. Les animations respectent Réduire les animations ; aucune animation ne tourne au repos. Le panneau mesure 360 × 470 points, limité à l’écran disponible, avec défilement si un message prend plus de place. Un deuxième clic sur l’icône referme le panneau sans arrêter la session. Option-clic active ou arrête directement la session.
+L’écran n’est pas maintenu allumé. Aucun minuteur de surveillance ne tourne lorsque Moka est arrêté et son panneau fermé. En session, les contrôles ont lieu toutes les cinq secondes en arrière-plan ; le compteur ne se rafraîchit chaque seconde que lorsque le panneau est visible. Le service capot n’a pas de minuteur actif au repos. Aucune animation ne tourne en boucle.
 
-Le robot de la barre des menus ferme les yeux à l’arrêt. Le point vert indique le maintien éveillé ordinaire. Une ligne rouge indique le capot actif, une restauration en cours ou une restauration non confirmée. Les infobulles et l’accessibilité annoncent également ces états.
+Pour économiser davantage, utiliser le [mode économie d’énergie de macOS](https://support.apple.com/fr-fr/101613) sur batterie ; les calculs peuvent être plus lents. Moka ne change pas ce réglage sans votre accord.
 
-## Fonctionnement
+**Ne pas maintenir un Mac actif dans un sac fermé.** Un écran éteint n’empêche pas le processeur de chauffer. Utiliser une surface dure et ventilée. Moka et son service arrêtent leur protection lorsque macOS signale un état thermique sérieux ou critique ; ce mécanisme n’est pas une garantie contre la surchauffe. Pour les tâches pendant le transport, utiliser une machine distante et laisser le portable dormir.
 
-La session utilise une assertion IOKit `PreventUserIdleSystemSleep`, comme `caffeinate -i`. Elle ne maintient pas l’écran allumé et ne supprime pas les assertions d’autres applications. Un arrêt libère l’assertion de Moka. L’application ne redémarre jamais une session au lancement. Une batterie sous le seuil empêche un nouveau démarrage ; sur secteur, le démarrage reste possible.
+## Mode capot et autorisation
 
-Le seuil du curseur est transmis au surveillant du capot en cours, sans nouvelle autorisation. Le processus privilégié n’accepte qu’une valeur décimale bornée entre 5 et 50, sans l’exécuter. Si le seuil ne peut plus être écrit, Moka arrête le mode capot. L’application vérifie la batterie toutes les cinq secondes pendant une session ; le surveillant la vérifie toutes les deux secondes. Les timers sont ralentis au repos et ne font pas de travail graphique permanent.
+La session ordinaire utilise IOKit `PreventUserIdleSystemSleep`, équivalent à `caffeinate -i`, sans privilèges administrateur. Le capot utilise temporairement le réglage global `pmset disablesleep`.
 
-Le capot utilise temporairement `pmset disablesleep`, un réglage global. Un surveillant restaure la valeur précédente à l’arrêt, si l’application disparaît, si sa surveillance s’interrompt, au seuil batterie ou au bout de quatre heures. L’interrupteur ne devient actif qu’après confirmation du lancement. La fermeture de Moka attend le résultat de la restauration.
+À la première activation du capot, un dialogue macOS autorise l’installation d’un service `launchd`. Aucun mot de passe n’est lu ou conservé par Moka. Ensuite, les boutons communiquent avec ce service par XPC, sans lancer de script administrateur à chaque session. Une nouvelle autorisation peut être nécessaire après une mise à jour, notamment avec les builds ad hoc dont l’identité change à chaque compilation.
 
-Si la veille était déjà désactivée avant Moka, cette valeur est conservée et le panneau l’explique. Garder le Mac ventilé, hors d’un sac. Après une coupure brutale, vérifier `pmset -g`. Le comportement physique du capot doit être validé sur chaque modèle : les tests simulés ne le prouvent pas.
+Le service ne reçoit que quatre opérations : commencer, renouveler avec un seuil de 5 à 50 %, arrêter et lire l’état. Il n’accepte aucun chemin ni aucune commande à exécuter. Il vérifie l’utilisateur et l’identité signée de l’application ; Moka vérifie également celle du service. Les binaires et la configuration du service appartiennent à root et ne sont pas modifiables par un utilisateur standard.
 
-## Construire et vérifier
+Avant d’activer le mode, le service enregistre le réglage initial. Il le restaure à l’arrêt, à la déconnexion de Moka, si la surveillance est interrompue pendant 25 secondes, au seuil batterie, en cas de forte chaleur ou après quatre heures. Il récupère également un journal laissé par un arrêt brutal du service. Une restauration échouée reste visible et fait l’objet de nouvelles tentatives. Le réglage de veille est contrôlé toutes les 30 secondes ; les changements externes réautorisant la veille sont respectés.
 
-Prérequis : macOS, les outils en ligne de commande Xcode avec un SDK macOS 26 ou ultérieur, et Python 3 pour les tests. Aucune installation de dépendances n’est nécessaire.
+**Si la veille était déjà désactivée avant Moka, cette valeur est conservée.** Le panneau le signale : libérer la protection de Moka ne suffit alors pas à rétablir la veille. Les assertions d’autres applications sont également conservées. Le comportement physique du capot doit être vérifié sur chaque modèle ; les tests automatisés ne le prouvent pas.
+
+Fichiers du service :
+
+- `/Library/PrivilegedHelperTools/fr.local.moka.helper`
+- `/Library/LaunchDaemons/fr.local.moka.helper.plist`
+- `/Library/Application Support/Moka/helper.plist` et, pendant une session, `session.plist`.
+
+Pour retirer le service, quitter Moka puis exécuter `sudo zsh Tools/uninstall-helper.sh` depuis les sources. Le script attend la restauration avant suppression ; si elle échoue, il conserve le service pour permettre une nouvelle tentative. Supprimer seulement Moka.app ne désinstalle pas ce service.
+
+## Interface et technologie
+
+Swift, SwiftUI, AppKit, IOKit, Security et NSXPCConnection. Aucune dépendance tierce, aucun serveur et aucun accès réseau. Binaire universel Apple Silicon + Intel, macOS 13 minimum. Liquid Glass à partir de macOS 26 ; fond translucide sur les versions précédentes. Vérifications réelles sur Apple Silicon avec macOS 27.2 ; les autres configurations ne sont pas validées sur matériel.
+
+Le personnage ouvre les yeux pendant la session. Point vert : maintien éveillé ordinaire. Ligne rouge : capot actif, restauration en cours ou non confirmée. Un deuxième clic sur l’icône referme le panneau. Option-clic active ou arrête la session. Les animations respectent Réduire les animations. Le panneau de 360 × 470 points s’adapte à la hauteur disponible avec défilement.
+
+## Construire et tester
+
+Prérequis : macOS et les outils en ligne de commande Xcode avec un SDK macOS 26 ou ultérieur.
 
 ```sh
 git clone https://github.com/theoduvivier/Moka.git
 cd Moka
-zsh build.sh
-zsh run-tests.sh
+./build.sh
+./run-tests.sh
 ```
 
-L’application compilée se trouve dans `build/Moka.app`.
+L’application est créée dans `build/Moka.app`. **98 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives et le refus de signatures XPC incorrectes. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
 
-Swift, SwiftUI, AppKit et IOKit. Aucune dépendance tierce, aucun serveur et aucun accès réseau. Les scripts produisent un binaire universel Apple Silicon + Intel, macOS 13 minimum. Liquid Glass est utilisé à partir de macOS 26 ; les versions antérieures ont un fond translucide. Les essais réels ont été effectués sur Apple Silicon avec macOS 27.2 ; les autres environnements n’ont pas été validés sur matériel.
+## Partager et avertissement macOS
 
-97 vérifications automatisées passent. Les tests couvrent les assertions IOKit réelles, l’arrêt de session au seuil, la migration depuis les anciennes préférences, l’absence de redémarrage automatique, le compteur, les indicateurs, la géométrie du panneau, le lanceur et le surveillant simulés, y compris les changements de seuil en cours. Les simulations ne changent jamais les vrais réglages de veille et n’ouvrent aucun dialogue administrateur.
+Envoyer `Moka-macOS.zip`. Le destinataire le décompresse, place Moka dans Applications et l’ouvre. Le ZIP ne contient ni réglage personnel, ni certificat privé, ni mot de passe. Le dépôt est privé : seuls les collaborateurs autorisés peuvent télécharger directement depuis GitHub ; le ZIP peut être envoyé séparément.
 
-## Partager
+**Cette version a une signature locale ad hoc, sans Developer ID et sans notarisation Apple.** Un avertissement ou un blocage Gatekeeper sur une copie téléchargée est donc attendu. Pour une application dont l’origine est connue, Apple documente l’ouverture via [Réglages Système → Confidentialité et sécurité → Ouvrir quand même](https://support.apple.com/fr-fr/102445). Ne pas désactiver Gatekeeper globalement. Le service privilégié de la copie téléchargée doit également être validé sur le Mac destinataire.
 
-Envoyer `Moka-macOS.zip`. Le destinataire le décompresse, place `Moka.app` dans Applications, puis l’ouvre. Les réglages personnels et mots de passe ne sont pas inclus.
+Pour supprimer l’avertissement « développeur non vérifié », il faut un abonnement Apple Developer, un certificat **Developer ID Application**, puis la [notarisation Apple](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution). Une confirmation normale de première ouverture d’une application téléchargée peut subsister.
 
-La signature actuelle est locale (ad hoc), sans Developer ID ni notarisation. Gatekeeper peut bloquer l’application sur un autre Mac. Si le destinataire fait confiance à son origine, Apple décrit l’ouverture dans [Confidentialité et sécurité](https://support.apple.com/fr-fr/102445).
+Le parcours de distribution est prêt :
 
-Pour une distribution publique : construire avec `MOKA_SIGN_IDENTITY` défini sur un certificat Developer ID Application, puis [notariser le paquet](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution). Le mode capot actuel utilise un surveillant temporaire ; un auxiliaire signé géré par SMAppService et XPC serait à envisager pour une distribution publique durable.
+```sh
+MOKA_SIGN_IDENTITY='Developer ID Application: Votre nom (TEAMID)' \
+MOKA_NOTARY_PROFILE='votre-profil-notarytool' ./distribute.sh
+```
+
+Il signe le service puis l’application avec Hardened Runtime, soumet l’archive à Apple, vérifie l’acceptation, agrafe le ticket, évalue Gatekeeper et produit un ZIP avec SHA-256. Il s’arrête sans certificat ou identifiants, sans retirer la quarantaine. Ne jamais versionner les clés privées ou identifiants Apple.
+
+La release 3.0.1 était un prototype ; 1.0.0 est la première version numérotée de Moka.

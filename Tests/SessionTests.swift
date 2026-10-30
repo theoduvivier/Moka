@@ -15,7 +15,8 @@ struct SessionTests {
         defaults.set(25, forKey: "duration")
         defaults.set(15, forKey: "reserve")
         var snapshot = PowerSnapshot(onBattery: true, percentage: 80)
-        let model = AppModel(defaults: defaults, readPower: { snapshot })
+        var thermal = ProcessInfo.ThermalState.nominal
+        let model = AppModel(defaults: defaults, readPower: { snapshot }, readThermal: { thermal })
         defer { model.shutdown() }
         var count = 0
         func check(_ condition: Bool, _ label: String) {
@@ -65,6 +66,14 @@ struct SessionTests {
         model.stop()
         check(!ownTypes().contains("PreventUserIdleSystemSleep"), "Manual stop releases the assertion")
         check(defaults.integer(forKey: "reserve") == 5, "Selected battery cutoff persists")
+        check(SessionPolicy.timerInterval(enabled: true, lidNeedsPulse: true, panelVisible: false) == 5, "Hidden session avoids one-second wakeups")
+        check(SessionPolicy.timerInterval(enabled: false, lidNeedsPulse: false, panelVisible: false) == 0, "Idle hidden application has no polling timer")
+        check(SessionPolicy.timerInterval(enabled: true, lidNeedsPulse: true, panelVisible: true) == 1, "Visible elapsed timer stays responsive")
+        thermal = .serious
+        model.start()
+        check(!model.enabled, "Hot Mac cannot start a wake session")
+        thermal = .nominal; model.start(); thermal = .serious; model.tick(refresh: true)
+        check(!model.enabled && !ownTypes().contains("PreventUserIdleSystemSleep"), "Strong heat releases wake assertion")
         print("\(count) simple-session tests passed")
     }
 }

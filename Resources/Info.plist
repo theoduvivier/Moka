@@ -4,8 +4,8 @@
 <key>CFBundleName</key><string>Moka</string>
 <key>CFBundleDisplayName</key><string>Moka</string>
 <key>CFBundleIdentifier</key><string>fr.local.moka</string>
-<key>CFBundleVersion</key><string>27</string>
-<key>CFBundleShortVersionString</key><string>3.0.1</string>
+<key>CFBundleVersion</key><string>28</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
 <key>CFBundleExecutable</key><string>Moka</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
