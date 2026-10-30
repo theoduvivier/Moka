@@ -78,4 +78,4 @@ MOKA_NOTARY_PROFILE='votre-profil-notarytool' ./distribute.sh
 
 Il signe le service puis l’application avec Hardened Runtime, soumet l’archive à Apple, vérifie l’acceptation, agrafe le ticket, évalue Gatekeeper et produit un ZIP avec SHA-256. Il s’arrête sans certificat ou identifiants, sans retirer la quarantaine. Ne jamais versionner les clés privées ou identifiants Apple.
 
-La release 3.0.1 était un prototype ; 1.0.0 est la première version numérotée de Moka.
+La numérotation de Moka commence à 1.0.0.
