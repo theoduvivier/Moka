@@ -17,9 +17,9 @@ final class FakeService: LidService {
         defer { defaults.removePersistentDomain(forName: suite) }
         do {
             let service = FakeService()
-            let lid = LidGuard(defaults: defaults, service: service)
+            let lid = LidGuard(defaults: defaults, service: service, isSupported: true)
             check(!lid.active && !lid.needsPulse, "Lid mode starts disabled")
-            let guardState = LidGuard(defaults: defaults, service: service)
+            let guardState = LidGuard(defaults: defaults, service: service, isSupported: true)
             guardState.start(reserve: 20)
             check(guardState.pending && !guardState.active, "Authorization does not prematurely activate the switch")
             service.authorization?(nil)
@@ -33,18 +33,18 @@ final class FakeService: LidService {
         }
         do {
             let service = FakeService()
-            let lid = LidGuard(defaults: defaults, service: service)
+            let lid = LidGuard(defaults: defaults, service: service, isSupported: true)
             lid.start(reserve: 20); lid.stop(); service.authorization?(nil)
             check(service.requests.isEmpty && !lid.active, "Late authorization after Stop cannot start a session")
         }
         do {
             let service = FakeService()
-            let state = LidGuard(defaults: defaults, service: service)
+            let state = LidGuard(defaults: defaults, service: service, isSupported: true)
             state.start(reserve: 20); service.authorization?("Annulée")
             check(!state.needsPulse && state.message == "Annulée", "Cancelled installation leaves no uncertain protection")
         }
         do {
-            let service = FakeService(); let lid = LidGuard(defaults: defaults, service: service)
+            let service = FakeService(); let lid = LidGuard(defaults: defaults, service: service, isSupported: true)
             lid.start(reserve: 20); service.authorization?(nil); lid.stop()
             service.requests[0].1(.success(.init(active: true)))
             check(!lid.active && lid.stopping, "Stale Begin reply cannot reverse Stop")
@@ -52,7 +52,7 @@ final class FakeService: LidService {
             check(!lid.needsPulse, "End reply completes a cancelled pending start")
         }
         do {
-            let service = FakeService(); let lid = LidGuard(defaults: defaults, service: service)
+            let service = FakeService(); let lid = LidGuard(defaults: defaults, service: service, isSupported: true)
             lid.start(reserve: 20); service.authorization?(nil)
             service.requests[0].1(.failure(NSError(domain: "test", code: 1)))
             check(lid.restorationFailed && lid.stopping && !lid.active && service.invalidations == 1, "Lost service invalidates lease and keeps warning visible")

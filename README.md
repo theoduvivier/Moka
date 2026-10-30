@@ -2,12 +2,12 @@
 
 <p align="center"><img src="docs/moka.png" width="360" alt="Moka : maintien éveillé, capot fermé et seuil de batterie"></p>
 
-Version **1.0.0** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
+Version **1.0.1** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
 
 Une application native dans la barre des menus, avec trois commandes :
 
 - **Garder le Mac éveillé** : les tâches peuvent continuer, l’écran peut s’éteindre normalement. **Arrêter la session** libère la protection de Moka. Le bouton affiche le temps écoulé.
-- **Aussi capot fermé** : continue en refermant le Mac. Le service demande une autorisation administrateur à sa première installation ; les activations suivantes n’en demandent pas.
+- **Aussi capot fermé** : visible uniquement sur les Mac portables, même branchés ou reliés à un écran externe. La présence du capot est détectée via IOKit, indépendamment de l’alimentation. Cette option continue les tâches en refermant le Mac. Le service demande une autorisation administrateur à sa première installation ; les activations suivantes n’en demandent pas.
 - **Seuil de batterie** : arrêt automatique entre 5 et 50 %, par pas de 5 %. Sur secteur, ce seuil ne s’applique pas. Recharger ne relance jamais une session automatiquement.
 
 ## Usage et autonomie

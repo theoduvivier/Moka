@@ -3,6 +3,19 @@ import CoreGraphics
 import IOKit.pwr_mgt
 import IOKit.ps
 
+enum MacHardware {
+    /// IOPM.h: a boolean exists for either lid position; absence means no lid.
+    /// This is a hardware capability, independent of the current power source.
+    static let hasLid: Bool = {
+        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard root != IO_OBJECT_NULL else { return false }
+        defer { IOObjectRelease(root) }
+        guard let state = IORegistryEntryCreateCFProperty(root, kAppleClamshellStateKey as CFString,
+                                                          kCFAllocatorDefault, 0)?.takeRetainedValue() else { return false }
+        return CFGetTypeID(state) == CFBooleanGetTypeID()
+    }()
+}
+
 struct PowerSnapshot: Equatable {
     var onBattery: Bool
     var percentage: Int?

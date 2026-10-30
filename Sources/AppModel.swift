@@ -32,13 +32,14 @@ final class AppModel: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
 
     init(defaults: UserDefaults = .standard, readPower: @escaping () -> PowerSnapshot = PowerSnapshot.read,
-         readThermal: @escaping () -> ProcessInfo.ThermalState = { ProcessInfo.processInfo.thermalState }) {
+         readThermal: @escaping () -> ProcessInfo.ThermalState = { ProcessInfo.processInfo.thermalState },
+         hasLid: Bool = MacHardware.hasLid) {
         self.defaults = defaults
         self.readPower = readPower
         self.readThermal = readThermal
         self.power = readPower()
         self.reserve = max(5, min(50, ((defaults.object(forKey: "reserve") as? Int ?? 15) + 2) / 5 * 5))
-        self.lid = LidGuard(defaults: defaults)
+        self.lid = LidGuard(defaults: defaults, isSupported: hasLid)
         lid.objectWillChange.sink { [weak self] in
             DispatchQueue.main.async { self?.objectWillChange.send(); self?.configureTimer() }
         }.store(in: &subscriptions)

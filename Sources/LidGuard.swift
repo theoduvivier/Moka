@@ -2,6 +2,7 @@ import Foundation
 import Combine
 
 final class LidGuard: ObservableObject {
+    let isSupported: Bool
     @Published private(set) var active = false
     @Published private(set) var pending = false
     @Published private(set) var stopping = false
@@ -21,7 +22,8 @@ final class LidGuard: ObservableObject {
     var unmanagedSleepDisabled: Bool { !needsPulse && systemSleepDisabled == true }
     var lastDiagnostic: String? { defaults.string(forKey: "lidLastDiagnostic") }
 
-    init(defaults: UserDefaults = .standard, service: LidService = HelperClient()) {
+    init(defaults: UserDefaults = .standard, service: LidService = HelperClient(), isSupported: Bool = MacHardware.hasLid) {
+        self.isSupported = isSupported
         self.defaults = defaults; self.service = service
     }
     func refreshSystemState() {
@@ -36,6 +38,7 @@ final class LidGuard: ObservableObject {
         }
     }
     func start(reserve: Int) {
+        guard isSupported else { return }
         guard !needsPulse else { return }
         self.reserve = max(5, min(50, reserve))
         generation = UUID(); let current = generation

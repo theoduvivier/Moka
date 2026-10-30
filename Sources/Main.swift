@@ -213,7 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let button = statusItem.button, let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
         let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        let frame = MenuGeometry.frame(anchor: anchor, visible: screen.visibleFrame)
+        let frame = MenuGeometry.frame(anchor: anchor, visible: screen.visibleFrame,
+                                       preferredHeight: model.lid.isSupported ? 470 : 414)
         let alreadyOpen = panel?.isVisible == true && !isPanelClosing
         let wasVisible = panel?.isVisible == true
         presentationGeneration &+= 1

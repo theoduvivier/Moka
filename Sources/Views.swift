@@ -56,7 +56,7 @@ struct MokaPanel: View {
                             .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                     }.frame(maxWidth: .infinity).padding(.bottom, 17)
                     sessionButton.padding(.bottom, 14)
-                    lidSwitch
+                    if model.lid.isSupported { lidSwitch }
                     divider.padding(.top, 3).padding(.bottom, 15)
                     batteryCutoff
                     if let notice = model.notice {
