@@ -7,16 +7,16 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <description>Mises à jour de Moka pour macOS</description>
     <language>fr</language>
     <item>
-      <title>Moka 1.0.2</title>
-      <pubDate>Fri, 30 Oct 2026 18:29:39 +0000</pubDate>
-      <sparkle:version>31</sparkle:version>
-      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+      <title>Moka 1.1.0</title>
+      <pubDate>Sat, 31 Oct 2026 17:22:37 +0000</pubDate>
+      <sparkle:version>32</sparkle:version>
+      <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
       <description>Une nouvelle version de Moka est disponible. L’installation relancera Moka et terminera la session en cours.</description>
-      <enclosure url="https://github.com/theoduvivier/Moka/releases/download/v1.0.2/Moka-macOS.zip" length="8951528" type="application/octet-stream" sparkle:edSignature="v9SD5d4K91izRjBC4RK/hx4tiN1lh+A5BxS9/UIXLg0chejGD66w20YjPtk1gXgXbaEF2q3muyTqfTK3l/PYDg=="></enclosure>
+      <enclosure url="https://github.com/theoduvivier/Moka/releases/download/v1.1.0/Moka-macOS.zip" length="9127060" type="application/octet-stream" sparkle:edSignature="QlInD9ao0MmuJ+aWXA6NWaPA15jHE3bAZFOmec/F5vVLRhVHwGWFUej4jUh8euPc2aLKoU0RfI+ubQjCWlb9Ag=="></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: X9ekWWuZTgKytLK38EBM8OJPgusbLOSR1jpcIB9c/RjRqfOa4oyiuHI55v8i/zzYQUYHArOqDcHNQpBL1ATDBg==
+edSignature: 8nccJ4aLsCY4+li/DCL2JRp9sBCxvhESMHMnctbV4kWwp8MtnR1XwNhrcCu9o3GrNOpuFGh9zCJnR1LH9GrnAw==
 length: 1294
 -->
