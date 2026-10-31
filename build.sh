@@ -15,20 +15,28 @@ mkdir -p "$UPDATER_DIR/Contents/MacOS" "$UPDATER_DIR/Contents/Resources" "$UPDAT
 SDK_PATH="$(xcrun --show-sdk-path)"
 if [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ]; then SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk; fi
 for ARCH in arm64 x86_64; do
+  xcrun swiftc -O -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
+    "$PROJECT_DIR/CLI/Main.swift" "$PROJECT_DIR/Sources/Core.swift" "$PROJECT_DIR/Shared/SessionLock.swift" -o "$STAGING_DIR/moka-cli-$ARCH" -framework IOKit
+  xcrun swiftc -O -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
+    "$PROJECT_DIR/Uninstaller/Main.swift" "$PROJECT_DIR/Shared/SessionLock.swift" "$PROJECT_DIR/Shared/UninstallPlan.swift" \
+    -o "$STAGING_DIR/MokaUninstaller-$ARCH" -framework AppKit
   xcrun swiftc -O -parse-as-library -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
     "$PROJECT_DIR"/Updater/*.swift -o "$STAGING_DIR/MokaUpdater-$ARCH" \
     -framework AppKit -F "$SPARKLE_DIR" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks
   xcrun swiftc -O -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
-    "$PROJECT_DIR"/Helper/*.swift "$PROJECT_DIR"/Shared/*.swift -o "$STAGING_DIR/MokaHelper-$ARCH" \
+    "$PROJECT_DIR"/Helper/*.swift "$PROJECT_DIR/Shared/CodeIdentity.swift" "$PROJECT_DIR/Shared/HelperProtocol.swift" "$PROJECT_DIR/Shared/SystemSleep.swift" -o "$STAGING_DIR/MokaHelper-$ARCH" \
     -framework Foundation -framework IOKit -framework Security
   xcrun swiftc -O -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
     "$PROJECT_DIR"/Sources/*.swift "$PROJECT_DIR"/Shared/*.swift -o "$STAGING_DIR/Moka-$ARCH" \
     -framework AppKit -framework SwiftUI -Xlinker -weak_framework -Xlinker Symbols -framework IOKit -framework Security
 done
+xcrun lipo -create "$STAGING_DIR/moka-cli-arm64" "$STAGING_DIR/moka-cli-x86_64" -output "$APP_DIR/Contents/MacOS/moka-cli"
+xcrun lipo -create "$STAGING_DIR/MokaUninstaller-arm64" "$STAGING_DIR/MokaUninstaller-x86_64" -output "$APP_DIR/Contents/Helpers/MokaUninstaller"
 xcrun lipo -create "$STAGING_DIR/MokaUpdater-arm64" "$STAGING_DIR/MokaUpdater-x86_64" -output "$UPDATER_DIR/Contents/MacOS/MokaUpdater"
 cp "$PROJECT_DIR/Resources/Updater-Info.plist" "$UPDATER_DIR/Contents/Info.plist"
 cp "$PROJECT_DIR/Resources/AppIcon.icns" "$UPDATER_DIR/Contents/Resources/"
 cp "$SPARKLE_DIR/LICENSE" "$APP_DIR/Contents/Resources/Sparkle-LICENSE.txt"
+cp "$PROJECT_DIR/Tools/uninstall-helper.sh" "$APP_DIR/Contents/Resources/uninstall-helper.sh"
 xcrun lipo -create "$STAGING_DIR/MokaHelper-arm64" "$STAGING_DIR/MokaHelper-x86_64" -output "$APP_DIR/Contents/Library/HelperTools/MokaHelper"
 xcrun lipo -create "$STAGING_DIR/Moka-arm64" "$STAGING_DIR/Moka-x86_64" -output "$APP_DIR/Contents/MacOS/Moka"
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
@@ -36,6 +44,8 @@ cp "$PROJECT_DIR/Resources/AppIcon.icns" "$PROJECT_DIR/Resources/Robot-awake.png
 /usr/bin/xattr -dr com.apple.FinderInfo "$APP_DIR" 2>/dev/null || true
 /usr/bin/xattr -dr com.apple.ResourceFork "$APP_DIR" 2>/dev/null || true
 if [ -n "${MOKA_SIGN_IDENTITY:-}" ]; then
+  /usr/bin/codesign --force --options runtime --timestamp --identifier fr.local.moka.cli --sign "$MOKA_SIGN_IDENTITY" "$APP_DIR/Contents/MacOS/moka-cli"
+  /usr/bin/codesign --force --options runtime --timestamp --identifier fr.local.moka.uninstaller --sign "$MOKA_SIGN_IDENTITY" "$APP_DIR/Contents/Helpers/MokaUninstaller"
   FRAMEWORK="$UPDATER_DIR/Contents/Frameworks/Sparkle.framework"
   for SERVICE in "$FRAMEWORK"/Versions/B/XPCServices/*.xpc; do
     /usr/bin/codesign --force --options runtime --preserve-metadata=entitlements --timestamp --sign "$MOKA_SIGN_IDENTITY" "$SERVICE"
@@ -47,6 +57,8 @@ if [ -n "${MOKA_SIGN_IDENTITY:-}" ]; then
   /usr/bin/codesign --force --options runtime --timestamp --identifier fr.local.moka.helper --sign "$MOKA_SIGN_IDENTITY" "$APP_DIR/Contents/Library/HelperTools/MokaHelper"
   /usr/bin/codesign --force --options runtime --timestamp --sign "$MOKA_SIGN_IDENTITY" "$APP_DIR"
 else
+  /usr/bin/codesign --force --options runtime --identifier fr.local.moka.cli --sign - "$APP_DIR/Contents/MacOS/moka-cli"
+  /usr/bin/codesign --force --options runtime --identifier fr.local.moka.uninstaller --sign - "$APP_DIR/Contents/Helpers/MokaUninstaller"
   # A separate unprivileged updater can load Sparkle without relaxing Library
   # Validation on Moka, whose identity authenticates access to the root service.
   # Sparkle's embedded tools retain their upstream Developer ID signatures.

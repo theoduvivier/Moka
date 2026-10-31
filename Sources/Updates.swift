@@ -1,8 +1,9 @@
 import AppKit
+import Combine
 
 /// One daily check while idle. Sparkle owns feed verification, UI, downloads,
 /// archive validation, installation and relaunch; never the privileged helper.
-final class UpdateCoordinator {
+final class UpdateCoordinator: ObservableObject {
     private let defaults: UserDefaults
     private let isBusy: () -> Bool
     private var timer: Timer?
@@ -17,7 +18,10 @@ final class UpdateCoordinator {
     }
     var automatic: Bool {
         get { defaults.bool(forKey: "mokaAutomaticUpdates") }
-        set { defaults.set(newValue, forKey: "mokaAutomaticUpdates"); schedule() }
+        set { objectWillChange.send(); defaults.set(newValue, forKey: "mokaAutomaticUpdates"); schedule() }
+    }
+    var hasOpenUpdater: Bool {
+        opening || !NSRunningApplication.runningApplications(withBundleIdentifier: "fr.local.moka.updater").isEmpty
     }
     func start() { started = true; schedule() }
     func stop() { started = false; timer?.invalidate(); timer = nil }

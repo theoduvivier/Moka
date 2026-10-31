@@ -58,6 +58,43 @@ enum SessionPolicy {
     }
 }
 
+enum SessionStopReason: Equatable {
+    case manual, battery(Int), thermal
+}
+
+/// A session-wide battery change, not energy attributed to Moka. Charging,
+/// missing readings or a rising gauge make that comparison unavailable.
+struct SessionBattery {
+    private var initial: Int?
+    private var last: Int?
+    private var comparable: Bool
+    init(_ power: PowerSnapshot) {
+        initial = power.percentage; last = power.percentage
+        comparable = power.onBattery && power.percentage != nil
+    }
+    mutating func observe(_ power: PowerSnapshot) {
+        guard comparable, power.onBattery, let value = power.percentage,
+              let previous = last, value <= previous else {
+            comparable = false; return
+        }
+        last = value
+    }
+    var points: Int? {
+        guard comparable, let initial, let last else { return nil }
+        return initial - last
+    }
+}
+
+struct SessionSummary: Equatable {
+    let seconds: TimeInterval
+    let batteryPoints: Int?
+    var text: String {
+        let minutes = Int(max(0, seconds) / 60)
+        let duration = minutes == 0 ? "moins d’une minute" : minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h \(minutes % 60) min"
+        return "Session : \(duration)" + (batteryPoints.map { " · \($0 == 0 ? "0" : "−\($0)") pt\($0 == 1 ? "" : "s") de batterie" } ?? "")
+    }
+}
+
 struct MokaError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -67,13 +104,13 @@ final class SleepAssertions {
     private var ids: [IOPMAssertionID] = []
     private var displayEnabled: Bool?
     var isActive: Bool { !ids.isEmpty }
-    func activate(display: Bool) throws {
+    func activate(display: Bool, reason: String = "Moka — session de travail") throws {
         if displayEnabled == display && isActive { return }
         var fresh: [IOPMAssertionID] = []
         let types = display ? [kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionTypePreventUserIdleDisplaySleep] : [kIOPMAssertionTypePreventUserIdleSystemSleep]
         for type in types {
             var id: IOPMAssertionID = 0
-            let result = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), "Moka — session de travail" as CFString, &id)
+            let result = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), reason as CFString, &id)
             guard result == kIOReturnSuccess else {
                 fresh.forEach { IOPMAssertionRelease($0) }
                 throw MokaError(message: "macOS n’a pas pu maintenir le Mac éveillé (\(result)).")

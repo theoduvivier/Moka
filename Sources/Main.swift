@@ -24,11 +24,11 @@ final class StatusActivityDot: NSView {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuItemValidation {
     let model = AppModel()
     private lazy var updates = UpdateCoordinator { [weak self] in
         guard let self else { return true }
-        return self.model.enabled || self.model.lid.needsPulse
+        return self.model.enabled || self.model.lid.needsPulse || self.model.uninstalling
     }
     private var statusItem: NSStatusItem!
     private var panel: MenuPanel?
@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var hostingView: NSHostingView<MokaPanel>?
     private var subscriptions: Set<AnyCancellable> = []
     private var quitTimer: Timer?
+    private var uninstallTimer: Timer?
+    private var uninstallReady = false
     private var renderedAwake: Bool?
     private var renderedIndicator: StatusProtectionIndicator?
     private var iconAnimationTimer: Timer?
@@ -119,6 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Utiliser dans le Terminal…", action: #selector(showTerminal), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: "Désinstaller Moka…", action: #selector(uninstall), keyEquivalent: "").target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         menu.addItem(appItem)
@@ -145,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.toolTip = "\(status) · \(model.sessionClock) écoulées"
 
         } else {
-            status = "Moka · Inactif"
+            status = "Moka · \(model.headline)"
             button.toolTip = "\(status) · Cliquer pour démarrer une session"
         }
         button.setAccessibilityLabel(status)
@@ -218,6 +223,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             automatic.target = self
             automatic.state = updates.automatic ? .on : .off
             menu.addItem(.separator())
+            menu.addItem(withTitle: "Utiliser dans le Terminal…", action: #selector(showTerminal), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "Désinstaller Moka…", action: #selector(uninstall), keyEquivalent: "").target = self
+            menu.addItem(.separator())
             menu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
@@ -226,8 +234,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         else { showPopover() }
     }
     @objc private func toggleSession() { model.toggle() }
-    @objc private func checkForUpdates() { hidePanel(); updates.checkNow() }
+    @objc private func checkForUpdates() {
+        guard !model.uninstalling else { return }
+        hidePanel(); updates.checkNow()
+    }
     @objc private func toggleAutomaticUpdates() { updates.automatic.toggle() }
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard !model.uninstalling else { return false }
+        if item.action == #selector(uninstall) { return !model.lid.pending && !updates.hasOpenUpdater }
+        return true
+    }
+    @objc private func showTerminal() {
+        guard !model.uninstalling else { return }
+        hidePanel(); NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Moka dans le Terminal"
+        alert.informativeText = "Copiez l’accès et collez-le dans votre Terminal, puis lancez par exemple :\n\nmoka run npm run build\n\nLe Mac reste éveillé jusqu’à la fin de la commande. L’écran peut s’éteindre ; le mode capot n’est pas activé. Le seuil de batterie reste appliqué. Cet accès est valable pour ce Terminal."
+        alert.addButton(withTitle: "Copier l’accès Terminal")
+        alert.addButton(withTitle: "Fermer")
+        if alert.runModal() == .alertFirstButtonReturn {
+            let path = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/moka-cli").path
+            let command = "moka() { \(ShellEscaping.quote(path)) \"$@\"; }\n"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+        }
+    }
+    @objc private func uninstall() {
+        guard !model.uninstalling, !model.lid.pending, !updates.hasOpenUpdater else { return }
+        hidePanel(); NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Désinstaller Moka ?"
+        alert.informativeText = "La session sera arrêtée, le réglage de veille restauré et cette copie de Moka placée dans la corbeille avec ses réglages et caches.\n\nUne autorisation macOS peut être nécessaire pour retirer le service capot. Les sources et autres documents seront conservés."
+        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: "Désinstaller Moka")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        model.uninstalling = true; updates.stop(); model.stop()
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        func proceed() {
+            AppUninstall.removeService { [weak self] error in
+                guard let self else { return }
+                if let error { self.uninstallFailed(error); return }
+                AppUninstall.finish { [weak self] error in
+                    guard let self else { return }
+                    if let error { self.uninstallFailed(error); return }
+                    self.uninstallReady = true
+                    NSApp.terminate(nil)
+                }
+            }
+        }
+        guard model.lid.needsPulse else { proceed(); return }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            self.model.lid.pulse()
+            if !self.model.lid.needsPulse {
+                timer.invalidate(); self.uninstallTimer = nil; proceed()
+            } else if ProcessInfo.processInfo.systemUptime >= deadline {
+                timer.invalidate(); self.uninstallTimer = nil
+                self.uninstallFailed("La restauration de la veille n’est pas encore confirmée. Moka est conservé ; attendez un instant puis réessayez.")
+            }
+        }
+        uninstallTimer = timer; RunLoop.main.add(timer, forMode: .common)
+    }
+    private func uninstallFailed(_ message: String) {
+        model.uninstalling = false; model.error = message; updates.start()
+        showPopover()
+    }
     private func showPopover() {
         guard let button = statusItem.button, let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
@@ -256,7 +327,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.delegate = self
             panel = window
         }
-        let root = MokaPanel(model: model, quit: { NSApp.terminate(nil) }, panelHeight: frame.height)
+        let root = MokaPanel(model: model, updates: updates, quit: { NSApp.terminate(nil) },
+                             checkUpdates: { [weak self] in self?.checkForUpdates() },
+                             terminal: { [weak self] in self?.showTerminal() },
+                             uninstall: { [weak self] in self?.uninstall() }, panelHeight: frame.height)
         if let hostingView { hostingView.rootView = root }
         else {
             let host = NSHostingView(rootView: root)
@@ -324,6 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if model.uninstalling && !uninstallReady { return .terminateCancel }
         if quitTimer?.isValid == true { return .terminateLater }
         let waitForGuard = model.lid.active || model.lid.pending || model.lid.stopping || model.lid.restorationFailed
         model.stop()

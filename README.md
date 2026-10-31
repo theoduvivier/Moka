@@ -2,7 +2,7 @@
 
 <p align="center"><img src="docs/moka.png" width="360" alt="Moka : maintien éveillé, capot fermé et seuil de batterie"></p>
 
-Version **1.0.2** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
+Version **1.1.0** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
 
 Une application native dans la barre des menus, avec trois commandes :
 
@@ -38,13 +38,34 @@ Fichiers du service :
 - `/Library/LaunchDaemons/fr.local.moka.helper.plist`
 - `/Library/Application Support/Moka/helper.plist` et, pendant une session, `session.plist`.
 
-Pour retirer le service, quitter Moka puis exécuter `sudo zsh Tools/uninstall-helper.sh` depuis les sources. Le script attend la restauration avant suppression ; si elle échoue, il conserve le service pour permettre une nouvelle tentative. Supprimer seulement Moka.app ne désinstalle pas ce service.
+## Désinstaller
+
+Dans le panneau, ouvrir **… → Désinstaller Moka…**. Après confirmation, Moka arrête la session, attend la restauration du réglage de veille, retire le service capot, puis place cette copie de l’application et ses préférences/caches dans la corbeille. Une autorisation macOS est nécessaire si le service administrateur est installé. En cas d’annulation ou d’échec de restauration, l’application est conservée. Une commande Terminal encore en cours bloque la désinstallation ; elle n’est jamais tuée.
+
+Les sources, documents, archives téléchargées, autres copies de l’application et clés de signature sont conservés. Quelques conteneurs temporaires WebKit protégés par macOS peuvent rester vides. La suppression du service est définitive ; une prochaine activation du capot pourra le réinstaller avec une nouvelle autorisation.
+
+Depuis les sources, il reste possible de quitter Moka puis d’exécuter `sudo zsh Tools/uninstall-helper.sh` pour retirer uniquement le service. Le script conserve le journal et le service si la restauration échoue. Supprimer seulement Moka.app ne désinstalle pas le service.
 
 ## Interface et technologie
 
 Swift, SwiftUI, AppKit, IOKit, Security et NSXPCConnection. Les mises à jour utilisent Sparkle 2.10.1 et GitHub, sans télémétrie ni serveur Moka. Binaire universel Apple Silicon + Intel, macOS 13 minimum. Liquid Glass à partir de macOS 26 ; fond translucide sur les versions précédentes. Vérifications réelles sur Apple Silicon avec macOS 27.2 ; les autres configurations ne sont pas validées sur matériel.
 
-Le personnage ouvre les yeux pendant la session. Point vert : maintien éveillé ordinaire. Ligne rouge : capot actif, restauration en cours ou non confirmée. Un deuxième clic sur l’icône referme le panneau. Option-clic active ou arrête la session. Les animations respectent Réduire les animations. Le panneau de 360 × 470 points s’adapte à la hauteur disponible avec défilement. Le bouton de session garde la même position entre marche et arrêt.
+Le personnage ouvre les yeux pendant la session. Point vert : maintien éveillé ordinaire. Ligne rouge : capot actif, restauration en cours ou non confirmée. Un deuxième clic sur l’icône referme le panneau. Option-clic active ou arrête la session. Les animations respectent Réduire les animations. Le panneau de 360 × 470 points s’adapte à la hauteur disponible avec défilement. Le bouton de session garde la même position entre marche et arrêt. Le menu **…** regroupe les mises à jour, l’accès au Terminal, la désinstallation et Quitter. Aucun panneau de réglages supplémentaire.
+
+Les arrêts sur batterie et surchauffe apparaissent dans le titre principal. Une ligne discrète affiche la baisse de batterie pendant la session, puis sa durée et son bilan à l’arrêt. Il s’agit de la variation de **tout le Mac**, pas de l’énergie consommée par Moka. Aucun bilan de batterie n’est affiché si une recharge, une mesure manquante ou une hausse de la jauge rend la comparaison incertaine. Le bilan reste en mémoire pour la session courante ; aucun historique n’est enregistré.
+
+## Utiliser avec une commande Terminal
+
+Dans **… → Utiliser dans le Terminal…**, cliquer sur **Copier l’accès Terminal**, puis coller dans un Terminal zsh ou bash. Cette fonction reste valable dans ce Terminal et ne modifie aucun fichier de configuration. Installer Moka à son emplacement définitif avant de copier l’accès.
+
+```sh
+moka run npm run build
+moka run --reserve 20 -- python3 mon_script.py
+```
+
+Le Mac reste éveillé jusqu’à la fin de la commande, tandis que l’écran peut s’éteindre. La commande conserve ses arguments, entrées/sorties, signaux et code de sortie. Moka n’active pas le mode capot. Le seuil est lu dans les réglages au démarrage, ou fixé avec `--reserve` entre 5 et 50 %. Au seuil ou en cas de forte chaleur, Moka libère sa protection sans tuer la commande. Une autre session Moka ou une autre application peut toujours maintenir le Mac éveillé.
+
+La protection suit la durée du processus lancé : pour un serveur ou un agent, garder la commande au premier plan plutôt que la faire se détacher en daemon. Plusieurs commandes peuvent fonctionner simultanément, chacune avec sa propre assertion. Elles sont indépendantes de la session du panneau. Si la batterie est déjà au seuil ou si le Mac est trop chaud, Moka refuse de lancer la commande.
 
 ## Construire et tester
 
@@ -57,7 +78,23 @@ cd Moka
 ./run-tests.sh
 ```
 
-L’application est créée dans `build/Moka.app`. **100 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives, la commande de vérification de l’installateur et le refus de signatures XPC incorrectes. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
+L’application est créée dans `build/Moka.app`. **131 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives, la commande de vérification de l’installateur et le refus de signatures XPC incorrectes. Les nouveaux tests vérifient aussi les bilans de session, les verrous entre commandes et désinstallation, et le script de retrait du service sur un système de fichiers et un launchd simulés. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
+
+Pour vérifier aussi la commande sur le binaire construit :
+
+```sh
+python3 Tests/CLIIntegrationTests.py /chemin/vers/Moka.app
+```
+
+Le cycle complet de désinstallation peut aussi être exécuté sur une application et des données factices isolées :
+
+```sh
+python3 Tests/UninstallerIntegrationTests.py
+```
+
+Ces 4 vérifications ne touchent ni l’installation courante, ni son service administrateur. Les éléments factices sont placés dans la corbeille.
+
+Les 15 vérifications Terminal lancent des commandes courtes et contrôlent les entrées/sorties, codes de sortie, signaux et assertions IOKit réelles. Elles n’activent pas le mode capot.
 
 Validation locale du 30 octobre 2026 : service installé avec autorisation macOS, deux activations consécutives sans nouvelle demande de mot de passe, `SleepDisabled` passant de 0 à 1 à l’activation puis revenant à 0 à l’arrêt. La restauration a aussi été vérifiée en quittant Moka avec le capot actif ; un relancement laisse la session arrêtée. La fermeture physique du capot et l’autonomie sur longue durée restent à vérifier sur chaque modèle.
 
@@ -80,7 +117,7 @@ Il signe les composants Sparkle, l’assistant de mise à jour, le service puis 
 
 ## Mises à jour intégrées
 
-Installer **1.0.2 une première fois manuellement** : les versions précédentes ne possèdent pas le moteur de mise à jour. Ensuite, Moka recherche une nouvelle version une fois par jour au repos. Une session en cours reporte la recherche automatique jusqu’à son arrêt. Clic droit sur l’icône → **Rechercher les mises à jour…** pour une recherche immédiate, ou **Rechercher automatiquement** pour activer/désactiver les recherches quotidiennes.
+Pour une version antérieure à **1.0.2**, installer la version actuelle une première fois manuellement : ces anciennes versions ne possèdent pas le moteur de mise à jour. Ensuite, Moka recherche une nouvelle version une fois par jour au repos. Une session en cours reporte la recherche automatique jusqu’à son arrêt. Dans le panneau, **… → Rechercher les mises à jour…** (ou clic droit sur l’icône) pour une recherche immédiate, ou **Rechercher automatiquement** pour activer/désactiver les recherches quotidiennes.
 
 Sparkle affiche la version disponible. L’utilisateur choisit de l’installer ; Moka quitte proprement, restaure son réglage de veille si nécessaire, puis se relance sans redémarrer de session. Le téléchargement et l’installation ne sont pas forcés. Une recherche manuelle peut être faite en session ; choisir d’installer termine celle-ci.
 
@@ -95,6 +132,8 @@ Pour préparer une prochaine release, incrémenter la version `1.x.y` et le num�
 ```
 
 Le script construit un ZIP, vérifie sa signature après extraction et génère un appcast signé dans `build/release/`. Avec `MOKA_SIGN_IDENTITY` et `MOKA_NOTARY_PROFILE`, il utilise également la notarisation. Publier d’abord ce ZIP et son SHA-256 dans la release `v1.x.y`, puis copier l’appcast signé dans `updates/appcast.xml` et pousser le commit. Ne jamais modifier un appcast après signature. Le script ne publie rien automatiquement.
+
+Validation 1.1.0 : panneau vérifié au repos, en session et après arrêt, position du bouton stable, confirmation de désinstallation annulable, assertions Terminal et cycle de désinstallation validés. Le retrait du service administrateur est testé avec launchd simulé ; aucune installation active n’est modifiée par ces essais.
 
 Validation 1.0.2 : détection de version par Sparkle, refus d’un flux modifié, refus d’une archive modifiée, installation et relancement réels depuis un flux local signé. La distribution notarisée et le matériel Intel restent à valider lorsqu’un certificat et une machine sont disponibles.
 

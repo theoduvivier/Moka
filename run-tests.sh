@@ -18,3 +18,6 @@ xcrun swiftc -swift-version 5 -module-cache-path "$MODULE_CACHE" "$PROJECT_DIR/S
 "$BUILD_DIR/xpc-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$MODULE_CACHE" "$PROJECT_DIR"/Shared/*.swift "$PROJECT_DIR/Sources/Core.swift" "$PROJECT_DIR/Sources/HelperInstaller.swift" "$PROJECT_DIR/Tests/InstallerTests.swift" -o "$BUILD_DIR/installer-tests" -framework IOKit -framework Security
 "$BUILD_DIR/installer-tests"
+xcrun swiftc -swift-version 5 -module-cache-path "$MODULE_CACHE" "${COMMON[@]}" "$PROJECT_DIR/Sources/AppModel.swift" "$PROJECT_DIR/Tests/ProductTests.swift" -o "$BUILD_DIR/product-tests" -framework AppKit -framework IOKit -framework Security
+"$BUILD_DIR/product-tests"
+python3 "$PROJECT_DIR/Tests/UninstallScriptTests.py"
