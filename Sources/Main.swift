@@ -47,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private let lidIndicator = StatusLidIndicator()
     private var presentationGeneration: UInt = 0
     private var isPanelClosing = false
+    private var nativeSessionStartedAt: TimeInterval = 0
+    private var pendingStatusClickClose: (() -> Void)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "fr.local.moka")
@@ -96,9 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             ])
         }
         updateStatus()
-        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, !self.pointerIsOverStatusButton else { return }
-            self.hidePanel()
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp]) { [weak self] event in
+            self?.handleGlobalMouseEvent(event)
         }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53, let self, self.panel?.isVisible == true, event.window === self.panel {
@@ -400,7 +401,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
         return frame.contains(NSEvent.mouseLocation)
     }
+    private func handleGlobalMouseEvent(_ event: NSEvent) {
+        let overStatusItem = pointerIsOverStatusButton
+        let isMouseUp = event.type == .leftMouseUp || event.type == .rightMouseUp
+        if #available(macOS 27, *) {
+            if isMouseUp {
+                let close = pendingStatusClickClose
+                pendingStatusClickClose = nil
+                // Let menu tracking finish this click before cancelling the
+                // captured session. Never close a newly opened replacement.
+                if overStatusItem { DispatchQueue.main.async { close?() } }
+                return
+            }
+            pendingStatusClickClose = nil
+            if overStatusItem {
+                if let session = statusItem?.expandedInterfaceSession,
+                   event.timestamp > nativeSessionStartedAt {
+                    pendingStatusClickClose = { [weak self, weak session] in
+                        guard let self, let session,
+                              self.statusItem?.expandedInterfaceSession === session else { return }
+                        self.hidePanel()
+                    }
+                }
+                return
+            }
+        }
+        if !isMouseUp && !overStatusItem { hidePanel() }
+    }
     func windowDidResignKey(_ notification: Notification) {
+        // A second status-item click briefly moves keyboard focus to the menu
+        // bar before AppKit ends the native session. Cancelling here races that
+        // click and makes AppKit start a new session on mouse-up instead.
+        // Native tracking owns these focus changes; outside clicks and Escape
+        // still dismiss through their explicit monitors.
+        if #available(macOS 27, *), statusItem?.expandedInterfaceSession != nil { return }
         // Clicking the status item can change the key window before or after its
         // action. Let that action alone decide whether this press opens/closes.
         // A keyboard focus change still dismisses, even if the pointer rests here.
@@ -463,6 +497,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 @available(macOS 27, *)
 extension AppDelegate: NSStatusItemExpandedInterfaceDelegate {
     func statusItem(_ statusItem: NSStatusItem, didBegin session: NSStatusItemExpandedInterfaceSession) {
+        // The originating mouse-down may reach the global monitor before or
+        // after this callback. Its timestamp must never count as a second click.
+        nativeSessionStartedAt = ProcessInfo.processInfo.systemUptime
         if NSEvent.modifierFlags.contains(.option) {
             model.toggle()
             session.cancel()
@@ -478,6 +515,7 @@ extension AppDelegate: NSStatusItemExpandedInterfaceDelegate {
     }
 
     func statusItemDidEndExpandedInterfaceSession(_ statusItem: NSStatusItem, animated: Bool) {
+        pendingStatusClickClose = nil
         hidePanel(animated: animated, cancelNativeSession: false)
     }
 }
