@@ -13,7 +13,13 @@ mkdir -p "$MODULE_CACHE" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 mkdir -p "$UPDATER_DIR/Contents/MacOS" "$UPDATER_DIR/Contents/Resources" "$UPDATER_DIR/Contents/Frameworks"
 /usr/bin/ditto --norsrc --noextattr "$SPARKLE_DIR/Sparkle.framework" "$UPDATER_DIR/Contents/Frameworks/Sparkle.framework"
 SDK_PATH="$(xcrun --show-sdk-path)"
-if [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ]; then SDK_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk; fi
+# The expanded-interface API is public in macOS 27. Runtime availability guards
+# keep the existing macOS 13+ fallback; building requires the macOS 27 SDK.
+SDK_VERSION="$(xcrun --show-sdk-version)"
+if (( ${SDK_VERSION%%.*} < 27 )); then
+  print -u2 'Moka nécessite le SDK macOS 27 ou ultérieur pour être compilé.'
+  exit 1
+fi
 for ARCH in arm64 x86_64; do
   xcrun swiftc -O -swift-version 5 -sdk "$SDK_PATH" -target "$ARCH-apple-macos13.0" -module-cache-path "$MODULE_CACHE" \
     "$PROJECT_DIR/CLI/Main.swift" "$PROJECT_DIR/Sources/Core.swift" "$PROJECT_DIR/Shared/SessionLock.swift" -o "$STAGING_DIR/moka-cli-$ARCH" -framework IOKit

@@ -2,7 +2,7 @@
 
 <p align="center"><img src="docs/moka.png" width="360" alt="Moka : maintien éveillé, capot fermé et seuil de batterie"></p>
 
-Version **1.1.0** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
+Version **1.1.1** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
 
 Une application native dans la barre des menus, avec trois commandes :
 
@@ -50,7 +50,7 @@ Depuis les sources, il reste possible de quitter Moka puis d’exécuter `sudo z
 
 Swift, SwiftUI, AppKit, IOKit, Security et NSXPCConnection. Les mises à jour utilisent Sparkle 2.10.1 et GitHub, sans télémétrie ni serveur Moka. Binaire universel Apple Silicon + Intel, macOS 13 minimum. Liquid Glass à partir de macOS 26 ; fond translucide sur les versions précédentes. Vérifications réelles sur Apple Silicon avec macOS 27.2 ; les autres configurations ne sont pas validées sur matériel.
 
-Le personnage ouvre les yeux pendant la session. Point vert : maintien éveillé ordinaire. Ligne rouge : capot actif, restauration en cours ou non confirmée. Un deuxième clic sur l’icône referme le panneau. Option-clic active ou arrête la session. Les animations respectent Réduire les animations. Le panneau de 360 × 470 points s’adapte à la hauteur disponible avec défilement. Le bouton de session garde la même position entre marche et arrêt. Le menu **…** regroupe les mises à jour, l’accès au Terminal, la désinstallation et Quitter. Aucun panneau de réglages supplémentaire.
+Le personnage ouvre les yeux pendant la session. Point vert : maintien éveillé ordinaire. Ligne rouge : capot actif, restauration en cours ou non confirmée. Un deuxième clic sur l’icône referme le panneau. Sur macOS 27, son ouverture utilise la session native de la barre des menus afin de conserver celle-ci en plein écran jusqu’à la fermeture du panneau. Option-clic active ou arrête la session. Les animations respectent Réduire les animations. Le panneau de 360 × 470 points s’adapte à la hauteur disponible avec défilement. Le bouton de session garde la même position entre marche et arrêt. Le menu **…** regroupe les mises à jour, l’accès au Terminal, la désinstallation et Quitter. Aucun panneau de réglages supplémentaire.
 
 Les arrêts sur batterie et surchauffe apparaissent dans le titre principal. Une ligne discrète affiche la baisse de batterie pendant la session, puis sa durée et son bilan à l’arrêt. Il s’agit de la variation de **tout le Mac**, pas de l’énergie consommée par Moka. Aucun bilan de batterie n’est affiché si une recharge, une mesure manquante ou une hausse de la jauge rend la comparaison incertaine. Le bilan reste en mémoire pour la session courante ; aucun historique n’est enregistré.
 
@@ -69,7 +69,7 @@ La protection suit la durée du processus lancé : pour un serveur ou un agent, 
 
 ## Construire et tester
 
-Prérequis : macOS et les outils en ligne de commande Xcode avec un SDK macOS 26 ou ultérieur. La première compilation télécharge Sparkle depuis sa release officielle et vérifie son SHA-256 épinglé dans `Tools/fetch-sparkle.sh`. Les dépendances téléchargées restent dans `build/`.
+Prérequis : macOS et les outils en ligne de commande Xcode avec un SDK macOS 27 ou ultérieur. La première compilation télécharge Sparkle depuis sa release officielle et vérifie son SHA-256 épinglé dans `Tools/fetch-sparkle.sh`. Les dépendances téléchargées restent dans `build/`.
 
 ```sh
 git clone https://github.com/theoduvivier/Moka.git
@@ -117,7 +117,7 @@ Il signe les composants Sparkle, l’assistant de mise à jour, le service puis 
 
 ## Mises à jour intégrées
 
-Pour une version antérieure à **1.0.2**, installer la version actuelle une première fois manuellement : ces anciennes versions ne possèdent pas le moteur de mise à jour. Ensuite, Moka recherche une nouvelle version une fois par jour au repos. Une session en cours reporte la recherche automatique jusqu’à son arrêt. Dans le panneau, **… → Rechercher les mises à jour…** (ou clic droit sur l’icône) pour une recherche immédiate, ou **Rechercher automatiquement** pour activer/désactiver les recherches quotidiennes.
+Pour une version antérieure à **1.0.2**, installer la version actuelle une première fois manuellement : ces anciennes versions ne possèdent pas le moteur de mise à jour. Ensuite, Moka recherche une nouvelle version une fois par jour au repos. Une session en cours reporte la recherche automatique jusqu’à son arrêt. Dans le panneau, **… → Rechercher les mises à jour…** pour une recherche immédiate, ou **Rechercher automatiquement** pour activer/désactiver les recherches quotidiennes.
 
 Sparkle affiche la version disponible. L’utilisateur choisit de l’installer ; Moka quitte proprement, restaure son réglage de veille si nécessaire, puis se relance sans redémarrer de session. Le téléchargement et l’installation ne sont pas forcés. Une recherche manuelle peut être faite en session ; choisir d’installer termine celle-ci.
 
@@ -132,6 +132,8 @@ Pour préparer une prochaine release, incrémenter la version `1.x.y` et le num�
 ```
 
 Le script construit un ZIP, vérifie sa signature après extraction et génère un appcast signé dans `build/release/`. Avec `MOKA_SIGN_IDENTITY` et `MOKA_NOTARY_PROFILE`, il utilise également la notarisation. Publier d’abord ce ZIP et son SHA-256 dans la release `v1.x.y`, puis copier l’appcast signé dans `updates/appcast.xml` et pousser le commit. Ne jamais modifier un appcast après signature. Le script ne publie rien automatiquement.
+
+Validation 1.1.1 : compilation avec le SDK macOS 27, 131 vérifications automatisées et 15 tests Terminal réussis. Les signatures du paquet universel sont vérifiées après extraction ; le binaire Terminal Intel démarre également via Rosetta. Le cycle de menu utilise `NSStatusItemExpandedInterfaceDelegate`, avec annulation à la fermeture du panneau. La vérification manuelle de la barre en plein écran reste à confirmer : l’outil d’automatisation n’a pas pu déclencher un clic physique fiable sur l’icône système. Le comportement antérieur est conservé sur macOS 13 à 26.
 
 Validation 1.1.0 : panneau vérifié au repos, en session et après arrêt, position du bouton stable, confirmation de désinstallation annulable, assertions Terminal et cycle de désinstallation validés. Le retrait du service administrateur est testé avec launchd simulé ; aucune installation active n’est modifiée par ces essais.
 

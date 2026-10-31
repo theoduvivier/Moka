@@ -72,7 +72,7 @@ struct RobotAvatar: View {
     var awake: Bool
     var size: CGFloat = 92
     var isVisible: Bool = false
-    @SwiftUI.State private var blink = 0.0
+    @ViewState private var blink = 0.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var canBlink: Bool { awake && isVisible && !reduceMotion }
     var body: some View {

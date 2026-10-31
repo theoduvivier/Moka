@@ -60,11 +60,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         installMenu()
         // Reserve space for the dot even when off; neighboring menu items stay put.
         statusItem = NSStatusBar.system.statusItem(withLength: 32)
-        statusItem.button?.target = self
-        statusItem.button?.action = #selector(statusClicked)
-        // Handle the press, not the release: a focus-loss dismissal between the
-        // two used to turn the second click into an unintended reopen.
-        statusItem.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+        if #available(macOS 27, *) {
+            // Let the menu bar own the expanded-interface lifetime, including
+            // its visibility in full screen and second-click dismissal.
+            // Do not attach an NSMenu to this button: it suppresses the
+            // expanded-interface callbacks. Commands remain in the panel's menu.
+            statusItem.expandedInterfaceDelegate = self
+        } else {
+            statusItem.button?.target = self
+            statusItem.button?.action = #selector(statusClicked)
+            // Handle the press, not the release, to avoid reopening on a
+            // second click after the panel has already lost focus.
+            statusItem.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+        }
         if let button = statusItem.button {
             lidIndicator.translatesAutoresizingMaskIntoConstraints = false
             lidIndicator.setAccessibilityElement(false)
@@ -216,22 +224,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if NSApp.currentEvent?.modifierFlags.contains(.option) == true { model.toggle(); return }
         if NSApp.currentEvent?.type == .rightMouseDown {
             let menu = NSMenu()
-            menu.addItem(withTitle: model.enabled ? "Terminer la session" : "Garder mon Mac éveillé", action: #selector(toggleSession), keyEquivalent: "").target = self
-            menu.addItem(.separator())
-            menu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
-            let automatic = menu.addItem(withTitle: "Rechercher automatiquement", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
-            automatic.target = self
-            automatic.state = updates.automatic ? .on : .off
-            menu.addItem(.separator())
-            menu.addItem(withTitle: "Utiliser dans le Terminal…", action: #selector(showTerminal), keyEquivalent: "").target = self
-            menu.addItem(withTitle: "Désinstaller Moka…", action: #selector(uninstall), keyEquivalent: "").target = self
-            menu.addItem(.separator())
-            menu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            populateStatusMenu(menu)
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
             statusItem.menu = nil
         } else if panel?.isVisible == true && !isPanelClosing { hidePanel() }
         else { showPopover() }
+    }
+    private func populateStatusMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        menu.addItem(withTitle: model.enabled ? "Terminer la session" : "Garder mon Mac éveillé", action: #selector(toggleSession), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        let automatic = menu.addItem(withTitle: "Rechercher automatiquement", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
+        automatic.target = self
+        automatic.state = updates.automatic ? .on : .off
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Utiliser dans le Terminal…", action: #selector(showTerminal), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Désinstaller Moka…", action: #selector(uninstall), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quitter Moka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
     @objc private func toggleSession() { model.toggle() }
     @objc private func checkForUpdates() {
@@ -358,7 +370,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
         }
     }
-    private func hidePanel() {
+    private func hidePanel(animated: Bool = true, cancelNativeSession: Bool = true) {
+        if #available(macOS 27, *), cancelNativeSession,
+           let session = statusItem?.expandedInterfaceSession {
+            session.cancel()
+            return
+        }
         guard let panel, panel.isVisible, !isPanelClosing else { return }
         presentationGeneration &+= 1
         let generation = presentationGeneration
@@ -367,7 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         panel.ignoresMouseEvents = true
         let reducedMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = reducedMotion ? 0.08 : 0.12
+            context.duration = animated ? (reducedMotion ? 0.08 : 0.12) : 0
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
@@ -427,6 +444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         return .terminateLater
     }
     func applicationWillTerminate(_ notification: Notification) {
+        hidePanel(animated: false)
         updates.stop()
         iconAnimationTimer?.invalidate()
         model.shutdown()
@@ -439,6 +457,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             view.cacheDisplay(in: view.bounds, to: bitmap)
             if let data = bitmap.representation(using: .png, properties: [:]) { try? data.write(to: URL(fileURLWithPath: path)) }
         }
+    }
+}
+
+@available(macOS 27, *)
+extension AppDelegate: NSStatusItemExpandedInterfaceDelegate {
+    func statusItem(_ statusItem: NSStatusItem, didBegin session: NSStatusItemExpandedInterfaceSession) {
+        if NSEvent.modifierFlags.contains(.option) {
+            model.toggle()
+            session.cancel()
+            return
+        }
+        // First-launch/reopen can display the panel before any item session
+        // exists. The first subsequent item click must still close that panel.
+        if panel?.isVisible == true && !isPanelClosing {
+            session.cancel()
+            return
+        }
+        showPopover()
+    }
+
+    func statusItemDidEndExpandedInterfaceSession(_ statusItem: NSStatusItem, animated: Bool) {
+        hidePanel(animated: animated, cancelNativeSession: false)
     }
 }
 
