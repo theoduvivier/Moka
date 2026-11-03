@@ -2,7 +2,7 @@
 
 <p align="center"><img src="docs/moka.png" width="360" alt="Moka : maintien éveillé, capot fermé et seuil de batterie"></p>
 
-Version **1.1.1** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
+Version **1.1.2** · [Téléchargements](https://github.com/theoduvivier/Moka/releases/latest).
 
 Une application native dans la barre des menus, avec trois commandes :
 
@@ -78,7 +78,7 @@ cd Moka
 ./run-tests.sh
 ```
 
-L’application est créée dans `build/Moka.app`. **131 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives, la commande de vérification de l’installateur et le refus de signatures XPC incorrectes. Les nouveaux tests vérifient aussi les bilans de session, les verrous entre commandes et désinstallation, et le script de retrait du service sur un système de fichiers et un launchd simulés. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
+L’application est créée dans `build/Moka.app`. **150 vérifications automatisées** couvrent les assertions IOKit réelles, l’arrêt sur batterie et chaleur, les transitions d’interface, les erreurs de restauration, les journaux, les sessions concurrentes, la perte de connexion, les autorisations tardives, la commande de vérification de l’installateur et le refus de signatures XPC incorrectes. Les nouveaux tests vérifient aussi les bilans de session, les verrous entre commandes et désinstallation, et le script de retrait du service sur un système de fichiers et un launchd simulés. Les tests XPC nécessitent un environnement macOS non bloqué par un sandbox de développement. Aucun test n’écrit dans les réglages `pmset` ni n’ouvre un dialogue administrateur.
 
 Pour vérifier aussi la commande sur le binaire construit :
 
@@ -132,6 +132,10 @@ Pour préparer une prochaine release, incrémenter la version `1.x.y` et le num�
 ```
 
 Le script construit un ZIP, vérifie sa signature après extraction et génère un appcast signé dans `build/release/`. Avec `MOKA_SIGN_IDENTITY` et `MOKA_NOTARY_PROFILE`, il utilise également la notarisation. Publier d’abord ce ZIP et son SHA-256 dans la release `v1.x.y`, puis copier l’appcast signé dans `updates/appcast.xml` et pousser le commit. Ne jamais modifier un appcast après signature. Le script ne publie rien automatiquement.
+
+La version 1.1.2 ajoute une lecture de secours de `SleepDisabled` dans IOKit lorsque `pmset` échoue ou omet ce réglage, notamment après le démarrage. Une valeur absente ou non booléenne reste une erreur : aucune activation ne devine le réglage initial. Les échecs de commande et le recours à IOKit sont journalisés dans le sous-système `fr.local.moka`, catégorie `SystemSleep`. Les tests couvrent les deux états initiaux, leur restauration et le refus lorsque les deux sources sont indisponibles. Cette correction couvre le défaut de lecture observé ; les anciens journaux ne permettent pas d’identifier la cause bas niveau exacte du premier échec.
+
+Validation 1.1.2 : 150 vérifications automatisées et 15 tests Terminal réussis ; les 19 tests de lecture passent également dans un service administrateur lancé par `launchd`. Paquet universel vérifié après extraction et démarrage du binaire Intel via Rosetta confirmé. Ces vérifications ne remplacent pas un essai après redémarrage complet du Mac.
 
 Validation 1.1.1 : compilation avec le SDK macOS 27, 131 vérifications automatisées et 15 tests Terminal réussis. Les signatures du paquet universel sont vérifiées après extraction ; le binaire Terminal Intel démarre également via Rosetta. Le cycle de menu utilise `NSStatusItemExpandedInterfaceDelegate`, avec annulation à la fermeture du panneau. Le test réel sur macOS 27.2 confirme le maintien de la barre en plein écran, la fermeture au deuxième clic et la fermeture au clic extérieur. Le deuxième clic est traité au relâchement pour ne pas rouvrir le panneau pendant le suivi natif de la souris. Le comportement antérieur est conservé sur macOS 13 à 26.
 

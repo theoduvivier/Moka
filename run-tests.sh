@@ -4,6 +4,8 @@ PROJECT_DIR="${0:A:h}"
 BUILD_DIR="$PROJECT_DIR/build"
 MODULE_CACHE="${MOKA_MODULE_CACHE:-$BUILD_DIR/module-cache}"
 mkdir -p "$MODULE_CACHE" "$BUILD_DIR"
+xcrun swiftc -swift-version 5 -module-cache-path "$MODULE_CACHE" "$PROJECT_DIR/Shared/SystemSleep.swift" "$PROJECT_DIR/Shared/HelperProtocol.swift" "$PROJECT_DIR/Helper/SessionEngine.swift" "$PROJECT_DIR/Tests/SystemSleepTests.swift" -o "$BUILD_DIR/system-sleep-tests" -framework IOKit
+"$BUILD_DIR/system-sleep-tests" --integration
 COMMON=("$PROJECT_DIR"/Shared/*.swift "$PROJECT_DIR/Sources/Core.swift" "$PROJECT_DIR/Sources/HelperInstaller.swift" "$PROJECT_DIR/Sources/HelperClient.swift" "$PROJECT_DIR/Sources/LidGuard.swift")
 xcrun swiftc -swift-version 5 -module-cache-path "$MODULE_CACHE" "$PROJECT_DIR/Sources/Core.swift" "$PROJECT_DIR/Tests/CoreTests.swift" -o "$BUILD_DIR/core-tests" -framework IOKit
 "$BUILD_DIR/core-tests" --integration
